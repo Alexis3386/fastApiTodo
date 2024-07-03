@@ -1,5 +1,5 @@
 from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from starlette import status
@@ -29,6 +29,8 @@ class UserVerification(BaseModel):
     password: str
     new_password: str = Field(min_length=6)
 
+class PhoneNumber(BaseModel):
+    phone_number: str = Field(pattern=r"^(?:(?:\+|00)33[\s.-]{0,3}(?:\(0\)[\s.-]{0,3})?|0)[1-9](?:(?:[\s.-]?\d{2}){4}|\d{2}(?:[\s.-]?\d{3}){2})$")
 
 @router.get('/', status_code=status.HTTP_200_OK)
 async def get_user(user: user_dependency, db: db_dependency):
@@ -51,5 +53,19 @@ async def change_password(user: user_dependency,
 
     hashed_password = bcrypt_context.hash(user_verification.new_password)
     user_model.hashed_password = hashed_password
+    db.add(user_model)
+    db.commit()
+
+
+@router.put('/phone_number', status_code=status.HTTP_204_NO_CONTENT)
+async def change_phone_number(user: user_dependency,
+                          db: db_dependency,
+                          phone_number: PhoneNumber
+                          ):
+    if user is None:
+        raise HTTPException(status_code=401, detail='Authentication failed')
+    user_model = db.query(Users).filter(Users.id == user.get('id')).first()
+
+    user_model.phone_number = phone_number.phone_number
     db.add(user_model)
     db.commit()
